@@ -7,6 +7,8 @@
    <video> element sharing the same blob for the Video mode.
    ============================================================ */
 
+const APP_V = '1.2';
+
 /* ---------- helpers ---------- */
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -255,6 +257,7 @@ function renderLibrary() {
     }).join('')}
   </div>`;
   if (!playlists.length) h += `<p class="hint">Playlists you create will live here &mdash;<br>Morning Run, Gym, Deep Work&hellip;</p>`;
+  h += `<p class="app-version">Motiv v${APP_V} &middot; library stored on this device</p>`;
   v.innerHTML = h;
 }
 
@@ -1071,4 +1074,7 @@ window.motivDemo = async function () {
   showTab('home');
   registerSW();
   requestPersistentStorage();
+  const prevV = localStorage.getItem('motiv-v');
+  if (prevV && prevV !== APP_V) toast(`Updated to v${APP_V}`);
+  localStorage.setItem('motiv-v', APP_V);
 })();
