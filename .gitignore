@@ -1,0 +1,5 @@
+.claude/
+.claudeignore
+CLAUDE.md
+.vercel/
+node_modules/

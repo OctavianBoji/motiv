@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Motiv</title>
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Motiv">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-180.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <div class="avatar">A</div>
+    <div class="wordmark">
+      <span class="logo-mark"><svg viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="7" fill="#0E7C3F"/><path d="M9.5 7.8v8.4l7-4.2-7-4.2Z" fill="#fff"/></svg></span>
+      Motiv
+    </div>
+    <button class="icon-btn ring" data-action="import" aria-label="Import videos">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </header>
+
+  <main id="views">
+    <section id="view-home" class="view active"></section>
+
+    <section id="view-search" class="view">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8"/><path d="M16 16l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input id="searchInput" type="search" placeholder="Search your audios and playlists" autocomplete="off">
+      </div>
+      <div id="searchResults"></div>
+    </section>
+
+    <section id="view-library" class="view"></section>
+    <section id="view-playlist" class="view"></section>
+  </main>
+
+  <div id="mini" class="mini" hidden data-action="expand">
+    <div class="mini-progress"><i id="miniBar"></i></div>
+    <img id="miniArt" alt="">
+    <div class="mini-body">
+      <div id="miniTitle" class="mini-title"></div>
+      <div id="miniMeta" class="mini-meta"></div>
+    </div>
+    <button class="icon-btn" data-action="toggle" id="miniPlay"></button>
+    <button class="icon-btn" data-action="next">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M6 5.8v12.4l9-6.2-9-6.2Z" fill="currentColor"/><rect x="16.6" y="5.8" width="1.8" height="12.4" rx=".9" fill="currentColor"/></svg>
+    </button>
+  </div>
+
+  <nav class="tabbar" id="tabbar">
+    <button class="tab active" data-action="tab" data-tab="home">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4.5 10.2 12 4l7.5 6.2V19a1.3 1.3 0 0 1-1.3 1.3h-4V14h-4.4v6.3h-4A1.3 1.3 0 0 1 4.5 19v-8.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="tab" data-action="tab" data-tab="search">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.7"/><path d="M16 16l4.2 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>Search</span>
+    </button>
+    <button class="tab" data-action="tab" data-tab="library">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M5 4.5v15M10 4.5v15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M14.5 5.2l4.6 13.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>Library</span>
+    </button>
+  </nav>
+
+  <section id="player" class="player mode-audio">
+    <div class="player-top">
+      <button class="icon-btn" data-action="collapse" aria-label="Close player">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 9.5l6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="player-ctx"><span>Playing from</span><b id="playerCtx">Library</b></div>
+      <button class="icon-btn" data-action="cur-menu" aria-label="Track options">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg>
+      </button>
+    </div>
+
+    <div class="stage" id="stage">
+      <img id="stageArt" alt="">
+      <video id="videoEl" playsinline webkit-playsinline preload="metadata"></video>
+    </div>
+
+    <div class="player-info">
+      <h1 id="playerTitle" class="player-title">Nothing playing</h1>
+      <div id="playerMeta" class="player-meta"></div>
+    </div>
+
+    <div class="seek-wrap">
+      <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="Seek">
+      <div class="times"><span id="tCur">0:00</span><span id="tDur">0:00</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="icon-btn side" data-action="shuffle" id="shuffleBtn" aria-label="Shuffle">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3.5 7h2.6c1.5 0 2.9.7 3.8 1.9l4.2 6.2c.9 1.2 2.3 1.9 3.8 1.9h2.6M3.5 17h2.6c1.5 0 2.9-.7 3.8-1.9l.7-1M14.1 8.9l.7-1c.9-1.2 2.3-1.9 3.8-1.9h1.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M18 4l2.5 2-2.5 2M18 15l2.5 2-2.5 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="icon-btn big-side" data-action="prev" aria-label="Previous">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M18 5.8v12.4l-9-6.2 9-6.2Z" fill="currentColor"/><rect x="5.6" y="5.8" width="1.8" height="12.4" rx=".9" fill="currentColor"/></svg>
+      </button>
+      <button class="play-big" data-action="toggle" id="bigPlay" aria-label="Play or pause"></button>
+      <button class="icon-btn big-side" data-action="next" aria-label="Next">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 5.8v12.4l9-6.2-9-6.2Z" fill="currentColor"/><rect x="16.6" y="5.8" width="1.8" height="12.4" rx=".9" fill="currentColor"/></svg>
+      </button>
+      <button class="icon-btn side" data-action="repeat" id="repeatBtn" aria-label="Repeat">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4.5 12V10a4 4 0 0 1 4-4h11M19.5 12v2a4 4 0 0 1-4 4h-11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M17 3.5 19.5 6 17 8.5M7 15.5 4.5 18 7 20.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="badge1" id="repeatBadge">1</span>
+      </button>
+    </div>
+
+    <div class="seg" id="modeSeg">
+      <button data-action="mode" data-mode="audio" class="active">Audio</button>
+      <button data-action="mode" data-mode="video">Video</button>
+    </div>
+  </section>
+
+  <div id="backdrop" class="backdrop" data-action="close-sheet"></div>
+  <div id="sheet" class="sheet"></div>
+  <div id="toast" class="toast"></div>
+
+  <input type="file" id="fileInput" accept="video/*,audio/*" multiple hidden>
+  <audio id="audioEl" preload="metadata"></audio>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
