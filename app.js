@@ -46,6 +46,7 @@ const I = {
   chevR: '<svg viewBox="0 0 24 24" fill="none"><path d="m9.5 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   shuffleSm: '<svg viewBox="0 0 24 24" fill="none"><path d="M3.5 7h2.6c1.5 0 2.9.7 3.8 1.9l4.2 6.2c.9 1.2 2.3 1.9 3.8 1.9h2.6M3.5 17h2.6c1.5 0 2.9-.7 3.8-1.9l.7-1M14.1 8.9l.7-1c.9-1.2 2.3-1.9 3.8-1.9h1.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M18 4l2.5 2-2.5 2M18 15l2.5 2-2.5 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   note: '<svg viewBox="0 0 24 24" fill="none"><path d="M9.5 17.5V6.2l9-2v11.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="2.5" stroke="currentColor" stroke-width="1.7"/><circle cx="16" cy="15.5" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg>',
+  queue: '<svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5h16M4 11.5h16M4 16.5h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14.5 14v6.4l5-3.2-5-3.2Z" fill="currentColor"/></svg>',
 };
 
 /* ---------- IndexedDB ---------- */
@@ -81,7 +82,9 @@ let shuffle = false;
 let repeat = 'off';           // 'off' | 'all' | 'one'
 let curUrl = null;
 let sheetCtx = null;
+let sheetKind = null;
 let toastTimer = null;
+let manualQueue = [];         // ids queued via swipe/menu — play before the context queue
 
 /* ---------- elements ---------- */
 const audioEl = $('#audioEl');
@@ -147,14 +150,17 @@ function ctxLabel(ctx) {
 function trackRow(t, ctx) {
   const playing = t.id === nowId();
   const btn = playing && isPlaying() ? I.pauseO : I.playO;
-  return `<div class="row${playing ? ' playing' : ''}" data-action="play" data-id="${t.id}" data-ctx="${ctx}">
-    <img class="row-thumb" src="${t.thumb}" alt="">
-    <div class="row-body">
-      <div class="row-title">${esc(t.title)}</div>
-      <div class="row-meta">${fmtWhen(t.addedAt)} &middot; ${fmtDur(t.duration)}</div>
+  return `<div class="swipe-wrap">
+    <div class="swipe-under add">${I.queue}<span>Queue</span></div>
+    <div class="row${playing ? ' playing' : ''}" data-swipe="add" data-action="play" data-id="${t.id}" data-ctx="${ctx}">
+      <img class="row-thumb" src="${t.thumb}" alt="">
+      <div class="row-body">
+        <div class="row-title">${esc(t.title)}</div>
+        <div class="row-meta">${fmtWhen(t.addedAt)} &middot; ${fmtDur(t.duration)}</div>
+      </div>
+      <button class="icon-btn row-menu" data-action="menu" data-id="${t.id}" data-ctx="${ctx}" aria-label="Options">${I.dots}</button>
+      <button class="icon-btn row-play" data-action="play" data-id="${t.id}" data-ctx="${ctx}" aria-label="Play">${btn}</button>
     </div>
-    <button class="icon-btn row-menu" data-action="menu" data-id="${t.id}" data-ctx="${ctx}" aria-label="Options">${I.dots}</button>
-    <button class="icon-btn row-play" data-action="play" data-id="${t.id}" data-ctx="${ctx}" aria-label="Play">${btn}</button>
   </div>`;
 }
 
@@ -356,6 +362,7 @@ function loadCurrent(autoplay) {
   setMediaSession(t);
   if (autoplay) playActive();
   refreshRowButtons();
+  if (sheetKind === 'queue') renderQueueSheet();
 }
 function playActive() {
   inactiveEl().pause();
@@ -368,6 +375,13 @@ function togglePlay() {
   if (isPlaying()) pauseActive(); else playActive();
 }
 function next(auto) {
+  if (manualQueue.length) {
+    const id = manualQueue.shift();
+    queue.splice(qi + 1, 0, id);
+    qi++;
+    loadCurrent(true);
+    return;
+  }
   if (!queue.length) return;
   if (qi < queue.length - 1) qi++;
   else if (repeat === 'all') qi = 0;
@@ -470,8 +484,10 @@ function setMediaSession(t) {
     navigator.mediaSession.setActionHandler('previoustrack', () => prev());
     navigator.mediaSession.setActionHandler('nexttrack', () => next());
     navigator.mediaSession.setActionHandler('seekto', d => { if (d.seekTime != null) { activeEl().currentTime = d.seekTime; updateProgress(); } });
-    navigator.mediaSession.setActionHandler('seekbackward', () => { activeEl().currentTime = Math.max(0, activeEl().currentTime - 15); });
-    navigator.mediaSession.setActionHandler('seekforward', () => { activeEl().currentTime = activeEl().currentTime + 15; });
+    // No seekbackward/seekforward handlers: registering them makes iOS show ±15s
+    // on the lock screen instead of previous/next track buttons.
+    try { navigator.mediaSession.setActionHandler('seekbackward', null); } catch (e) {}
+    try { navigator.mediaSession.setActionHandler('seekforward', null); } catch (e) {}
   } catch (e) {}
 }
 function expandPlayer() { if (curTrack()) playerEl.classList.add('open'); }
@@ -549,14 +565,16 @@ async function importFiles(files) {
 /* ============================================================
    SHEETS + TOAST
    ============================================================ */
-function openSheet(html, ctx) {
+function openSheet(html, ctx, kind) {
   sheetCtx = ctx || null;
+  sheetKind = kind || null;
   $('#sheet').innerHTML = `<div class="sheet-grab"></div>` + html;
   $('#sheet').classList.add('open');
   $('#backdrop').classList.add('open');
 }
 function closeSheet() {
   sheetCtx = null;
+  sheetKind = null;
   $('#sheet').classList.remove('open');
   $('#backdrop').classList.remove('open');
 }
@@ -577,6 +595,7 @@ function sheetTrackMenu(id, ctx) {
       <img src="${t.thumb}" alt="">
       <div><div class="t">${esc(t.title)}</div><div class="m">${fmtWhen(t.addedAt)} &middot; ${fmtDur(t.duration)}</div></div>
     </div>
+    <button class="sheet-item" data-action="sheet-queue">${I.queue}<span class="grow">Add to queue</span></button>
     <button class="sheet-item" data-action="sheet-add-to-pl">${I.addPl}<span class="grow">Add to playlist</span></button>
     ${inPl ? `<button class="sheet-item" data-action="sheet-remove">${I.minusPl}<span class="grow">Remove from this playlist</span></button>` : ''}
     <button class="sheet-item" data-action="sheet-rename">${I.pencil}<span class="grow">Rename</span></button>
@@ -642,6 +661,113 @@ function sheetPlMenu(plId) {
   `, { plId });
 }
 
+/* ---------- queue ---------- */
+function addToQueue(id) {
+  if (!curTrack()) { startQueue([id], id, 'Queue'); return; }
+  manualQueue.push(id);
+  toast('Added to queue');
+  if (sheetKind === 'queue') renderQueueSheet();
+}
+function queueRow(t, qtype, idx) {
+  return `<div class="swipe-wrap">
+    <div class="swipe-under remove">${I.trash}</div>
+    <div class="row qrow" data-swipe="remove" data-action="queue-jump" data-qtype="${qtype}" data-qidx="${idx}" data-id="${t.id}">
+      <img class="row-thumb" src="${t.thumb}" alt="">
+      <div class="row-body">
+        <div class="row-title">${esc(t.title)}</div>
+        <div class="row-meta">${fmtDur(t.duration)}</div>
+      </div>
+    </div>
+  </div>`;
+}
+function renderQueueSheet() {
+  const cur = curTrack();
+  if (!cur) { closeSheet(); return; }
+  sw = null; // cancel any in-flight swipe before its row is replaced
+  const manual = manualQueue.map(trackById).filter(Boolean);
+  const upcoming = queue.slice(qi + 1).map(trackById).filter(Boolean);
+  openSheet(`
+    <div class="sheet-title">Queue</div>
+    <div class="q-section"><span>Now playing</span></div>
+    <div class="row qrow now">
+      <img class="row-thumb" src="${cur.thumb}" alt="">
+      <div class="row-body">
+        <div class="row-title">${esc(cur.title)}</div>
+        <div class="row-meta">${fmtDur(cur.duration)}</div>
+      </div>
+    </div>
+    ${manual.length ? `<div class="q-section"><span>Next in queue</span><button class="q-clear" data-action="clear-queue">Clear</button></div>
+      ${manualQueue.map((id, i) => { const t = trackById(id); return t ? queueRow(t, 'manual', i) : ''; }).join('')}` : ''}
+    ${upcoming.length ? `<div class="q-section"><span>Next from: ${esc(ctxName || 'Library')}</span></div>
+      ${queue.slice(qi + 1).map((id, i) => { const t = trackById(id); return t ? queueRow(t, 'ctx', qi + 1 + i) : ''; }).join('')}` : ''}
+    ${!manual.length && !upcoming.length ? '<p class="hint" style="margin:18px 0 10px">Nothing up next &mdash; swipe any track to the right to queue it.</p>' : ''}
+  `, null, 'queue');
+}
+function removeFromQueueRow(row) {
+  const qtype = row.dataset.qtype, idx = +row.dataset.qidx;
+  if (qtype === 'manual') manualQueue.splice(idx, 1);
+  else if (qtype === 'ctx') {
+    const removed = queue.splice(idx, 1)[0];
+    const bi = baseQueue.indexOf(removed);
+    if (bi > -1) baseQueue.splice(bi, 1);
+    if (idx <= qi) qi--;
+  }
+  renderQueueSheet();
+}
+
+/* ---------- swipe gestures (Spotify-style) ---------- */
+let sw = null;
+let swipeJustCommitted = false;
+
+function swipeSettle(row, x, after) {
+  row.classList.add('settling');
+  row.style.transform = x ? `translateX(${x}px)` : '';
+  setTimeout(() => { row.classList.remove('settling'); if (after) after(); }, 300);
+}
+function onPointerDown(e) {
+  if (e.button > 0) return;
+  const row = e.target.closest('[data-swipe]');
+  if (!row) return;
+  sw = { row, pid: e.pointerId, startX: e.clientX, startY: e.clientY, dx: 0, engaged: false, mode: row.dataset.swipe };
+}
+function onPointerMove(e) {
+  if (!sw || e.pointerId !== sw.pid) return;
+  const dx = e.clientX - sw.startX, dy = e.clientY - sw.startY;
+  if (!sw.engaged) {
+    if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      sw.engaged = true;
+      try { sw.row.setPointerCapture(e.pointerId); } catch (err) {}
+    } else if (Math.abs(dy) > 14) { sw = null; return; }
+    else return;
+  }
+  const w = sw.row.offsetWidth;
+  sw.dx = sw.mode === 'add' ? Math.max(0, Math.min(dx, w)) : Math.min(0, Math.max(dx, -w));
+  sw.row.style.transform = `translateX(${sw.dx}px)`;
+}
+function onPointerUp(e) {
+  if (!sw || e.pointerId !== sw.pid) return;
+  const { row, dx, engaged, mode } = sw;
+  sw = null;
+  if (!engaged) return;
+  swipeJustCommitted = true;
+  setTimeout(() => { swipeJustCommitted = false; }, 350);
+  const commit = Math.abs(dx) > row.offsetWidth * 0.3;
+  if (commit && mode === 'add') {
+    swipeSettle(row, 0);
+    addToQueue(row.dataset.id);
+  } else if (commit && mode === 'remove') {
+    swipeSettle(row, (dx < 0 ? -1.1 : 1.1) * row.offsetWidth, () => removeFromQueueRow(row));
+  } else {
+    swipeSettle(row, 0);
+  }
+}
+function onPointerCancel(e) {
+  if (!sw || e.pointerId !== sw.pid) return;
+  const { row, engaged } = sw;
+  sw = null;
+  if (engaged) swipeSettle(row, 0);
+}
+
 /* ---------- mutations ---------- */
 async function addTrackToPlaylist(trackId, plId) {
   const pl = plById(plId);
@@ -672,6 +798,7 @@ async function deleteTrack(id) {
     }
   }
   const wasCurrent = nowId() === id;
+  manualQueue = manualQueue.filter(x => x !== id);
   baseQueue = baseQueue.filter(x => x !== id);
   const oldQi = qi;
   queue = queue.filter((x, i) => { if (x === id && i < oldQi) qi--; return x !== id; });
@@ -728,6 +855,21 @@ async function handleAction(btn) {
     case 'pl-menu': sheetPlMenu(id); break;
 
     case 'close-sheet': closeSheet(); break;
+
+    case 'open-queue': renderQueueSheet(); break;
+    case 'queue-jump': {
+      const qtype = btn.dataset.qtype, idx = +btn.dataset.qidx;
+      if (qtype === 'manual') {
+        const jumpId = manualQueue.splice(idx, 1)[0];
+        if (jumpId) { queue.splice(qi + 1, 0, jumpId); qi++; loadCurrent(true); }
+      } else if (qtype === 'ctx') {
+        qi = Math.min(idx, queue.length - 1);
+        loadCurrent(true);
+      }
+      break;
+    }
+    case 'clear-queue': manualQueue = []; renderQueueSheet(); break;
+    case 'sheet-queue': { const c = sheetCtx; closeSheet(); addToQueue(c.trackId); break; }
 
     case 'sheet-add-to-pl': { const c = sheetCtx; closeSheet(); sheetPickPlaylist(c.trackId); break; }
     case 'sheet-remove': {
@@ -815,10 +957,16 @@ function expandIfNewGesture() { /* row tap on current track only toggles; no exp
 
 function bindEvents() {
   document.addEventListener('click', e => {
+    if (swipeJustCommitted) return;
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     handleAction(btn);
   });
+
+  document.addEventListener('pointerdown', onPointerDown);
+  document.addEventListener('pointermove', onPointerMove);
+  document.addEventListener('pointerup', onPointerUp);
+  document.addEventListener('pointercancel', onPointerCancel);
 
   $('#fileInput').addEventListener('change', e => {
     importFiles([...e.target.files]);

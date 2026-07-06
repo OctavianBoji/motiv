@@ -1,4 +1,4 @@
-const V = 'motiv-v2';
+const V = 'motiv-v3';
 const ASSETS = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -13,14 +13,16 @@ self.addEventListener('activate', e => {
   );
 });
 
+// Network-first: always serve fresh code when online (updates land immediately),
+// fall back to the cache so the app still opens offline.
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return;
   e.respondWith(
-    caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+    fetch(e.request).then(res => {
       const copy = res.clone();
       caches.open(V).then(c => c.put(e.request, copy));
       return res;
-    }).catch(() => caches.match('./index.html')))
+    }).catch(() => caches.match(e.request).then(hit => hit || caches.match('./index.html')))
   );
 });

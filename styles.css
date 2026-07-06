@@ -416,6 +416,46 @@ body.has-mini .view {
 .sheet-actions { display: flex; gap: 10px; padding: 0 4px; }
 .sheet-actions .pill { flex: 1; justify-content: center; }
 
+/* ---------- swipe gestures ---------- */
+.swipe-wrap { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+.list .swipe-wrap:last-child, .sheet .swipe-wrap:last-child { border-bottom: 0; }
+.swipe-wrap .row {
+  border-bottom: 0; background: #fff;
+  position: relative; z-index: 1;
+  touch-action: pan-y;
+  user-select: none; -webkit-user-select: none;
+}
+.swipe-wrap .row.settling { transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.3, 1); }
+.swipe-under {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; gap: 8px;
+  color: #fff; font-weight: 700; font-size: 13px;
+}
+.swipe-under.add { background: var(--green); justify-content: flex-start; padding-left: 18px; }
+.swipe-under.remove { background: var(--danger); justify-content: flex-end; padding-right: 18px; }
+.swipe-under svg { width: 22px; height: 22px; }
+
+/* ---------- queue sheet ---------- */
+.q-section {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--sub);
+  margin: 16px 8px 2px;
+}
+.q-clear {
+  border: 0; background: none; color: var(--green);
+  font-weight: 700; font-size: 12.5px; cursor: pointer;
+  letter-spacing: 0; text-transform: none; padding: 0;
+}
+.qrow { padding: 10px 8px; }
+.qrow .row-thumb { width: 44px; height: 44px; border-radius: 10px; }
+.qrow.now .row-title { color: var(--green); }
+
+/* ---------- player bottom row ---------- */
+.player-bottom { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 2px; }
+.player-bottom .seg { margin: 0; }
+.pb-spacer { width: 38px; flex: none; }
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed; left: 50%;
